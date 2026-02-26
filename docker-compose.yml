@@ -1,0 +1,50 @@
+services:
+  nginx6:
+    build: ~/Downloads/docker-work/https-backend-app/nginx/
+    networks:
+      - app-net
+    ports:
+      - "8443:8443"
+    depends_on:
+      - app 
+  
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=example
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password
+    networks:
+      app-net:
+        ipv4_address: 172.19.0.3
+
+    healthcheck:
+      # Ensures the DB is ready before the app starts
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    networks:
+      app-net:
+        ipv4_address: 172.19.0.2
+    environment:
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+    depends_on:
+      db:
+        condition: service_healthy
+    secrets:
+      - db_password
+
+secrets:
+  db_password:
+    file: ./password.txt
+
+networks:
+  app-net:
+    driver: bridge
